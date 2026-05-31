@@ -16,11 +16,10 @@ import altair as alt
 import pickle
 import pydeck as pdk
 import os
-#from langchain.llms import OpenAI
-from langchain.chat_models import ChatOpenAI
-from langchain import PromptTemplate
-from langchain.chains import LLMChain
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+# langchain 1.x: ChatOpenAI moved to langchain_openai, PromptTemplate to
+# langchain_core; LLMChain is removed -- chains are now LCEL (prompt | llm).
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
 from itertools import combinations
 from pydeck.types import String
 
@@ -40,8 +39,10 @@ MAPBOX_TOKEN = st.secrets["MAPBOX_TOKEN"]
 #             max_tokens=600)
 
 
-llm = ChatOpenAI(model_name = 'gpt-4o-mini', # 'gpt-3.5-turbo', # 'text-davinci-003' , 'gpt-3.5-turbo'
+llm = ChatOpenAI(model='gpt-5.4-mini',   # successor to gpt-4o-mini (faster + sharper)
              temperature=0.2,
+             # langchain_openai translates max_tokens -> max_completion_tokens,
+             # which gpt-5.x requires (it rejects the legacy max_tokens param).
              max_tokens=3200)
 
 article_template = """
@@ -72,7 +73,7 @@ prompt_article = PromptTemplate(
 )
 
 
-chain_article = LLMChain(llm=llm, prompt=prompt_article)
+chain_article = prompt_article | llm
 
 
 def get_article_llm_description(title:str, abstract:str, authors:list, affils:list):
@@ -82,8 +83,10 @@ def get_article_llm_description(title:str, abstract:str, authors:list, affils:li
     """
     authors = "; ".join(authors)
     affils = "; ".join(affils)
-    return chain_article.run(article_title=title,article_abstract=abstract,
-                           author_list=authors, affiliation_list=affils )
+    return chain_article.invoke({"article_title": title,
+                                 "article_abstract": abstract,
+                                 "author_list": authors,
+                                 "affiliation_list": affils}).content
 
 ############################################################################
 
@@ -133,9 +136,9 @@ detailed_prompt_topic = PromptTemplate(
     template=detailed_topic_template,
 )
 
-chain_topic= LLMChain(llm=llm, prompt=prompt_topic)
+chain_topic = prompt_topic | llm
 
-detailed_chain_topic= LLMChain(llm=llm, prompt=detailed_prompt_topic)
+detailed_chain_topic = detailed_prompt_topic | llm
 
 def get_topic_llm_description(key_phrases:list):
     """
@@ -144,7 +147,7 @@ def get_topic_llm_description(key_phrases:list):
     """
   #  st.write(type(key_phrases))
     topic_phrases = ", ".join(key_phrases)
-    return chain_topic.run(topic_phrases=topic_phrases)
+    return chain_topic.invoke({"topic_phrases": topic_phrases}).content
 
 
 def get_detailed_topic_llm_description(texts:list):
@@ -154,7 +157,7 @@ def get_detailed_topic_llm_description(texts:list):
     """
   #  st.write(type(texts))
     topic_texts = ":: ".join(texts)
-    return detailed_chain_topic.run(topic_texts=topic_texts)
+    return detailed_chain_topic.invoke({"topic_texts": topic_texts}).content
 
 
 
