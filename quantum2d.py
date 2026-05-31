@@ -76,10 +76,14 @@ prompt_article = PromptTemplate(
 chain_article = prompt_article | llm
 
 
+@st.cache_data(show_spinner=False)
 def get_article_llm_description(title:str, abstract:str, authors:list, affils:list):
     """
     takes in the key_phrases list, and the article title
     and returns the openai returned description.
+
+    Cached: Streamlit reruns the whole script on every interaction; without
+    caching this LLM call re-fires (and re-bills) on each tab click.
     """
     authors = "; ".join(authors)
     affils = "; ".join(affils)
@@ -150,10 +154,14 @@ def get_topic_llm_description(key_phrases:list):
     return chain_topic.invoke({"topic_phrases": topic_phrases}).content
 
 
+@st.cache_data(show_spinner=False)
 def get_detailed_topic_llm_description(texts:list):
     """
     takes in the texts list
     and returns the openai returned description.
+
+    Cached: this ~100-abstract call takes ~10s; without caching it re-fires on
+    every rerun (e.g. each tab click), which is what stalled the topic tabs.
     """
   #  st.write(type(texts))
     topic_texts = ":: ".join(texts)
@@ -875,7 +883,11 @@ dvjournals, kwjournals = get_journals_cluster_sort(dftriple, selected_cluster)
 
 dvconferences, kwconferences = get_conferences_cluster_sort(dftriple, selected_cluster)
 
-htmlfile = create_pyvis_html(selected_cluster)
+# DISABLED: create_pyvis_html rebuilds the full PyVis coauthorship graph on
+# EVERY rerun (st.tabs renders all tab bodies eagerly, not just the active one),
+# which hangs the app for large clusters. Re-enable only behind an explicit
+# button if needed.
+# htmlfile = create_pyvis_html(selected_cluster)
 
 dftime = get_time_series(dfinfo, selected_cluster)
 
@@ -966,7 +978,11 @@ with tab5:
 
 with tab6:
     st.write("Coauthorship Graph (Papers and Authors)")
-    components.html(htmlfile.read(), height=1100)
+    st.info("Coauthorship graph temporarily disabled for performance — it "
+            "rebuilt on every interaction and stalled large topics. Use the "
+            "**Download Selected Papers** button above to inspect coauthorship "
+            "offline.")
+    # components.html(htmlfile.read(), height=1100)
     
 with tab7:
     st.write("Country-Country Collaborations")
