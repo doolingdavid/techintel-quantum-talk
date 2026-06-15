@@ -85,8 +85,16 @@ def get_article_llm_description(title:str, abstract:str, authors:list, affils:li
     Cached: Streamlit reruns the whole script on every interaction; without
     caching this LLM call re-fires (and re-bills) on each tab click.
     """
-    authors = "; ".join(authors)
-    affils = "; ".join(affils)
+    # author_list / affil_list can be a list/array with NaN floats, or a bare
+    # NaN float when OpenAlex has no data; join only the real strings so neither
+    # case raises TypeError and silently drops us into the topic-only path.
+    # (author_list cells are numpy arrays here, so accept any non-str iterable.)
+    def _join_strs(seq):
+        if not hasattr(seq, "__iter__") or isinstance(seq, str):
+            return ""
+        return "; ".join(str(a) for a in seq if isinstance(a, str))
+    authors = _join_strs(authors)
+    affils = _join_strs(affils)
     return chain_article.invoke({"article_title": title,
                                  "article_abstract": abstract,
                                  "author_list": authors,
